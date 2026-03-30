@@ -1,0 +1,15 @@
+sp_appliance_base: "https://172.22.140.12/gms/rest"
+sp_user: "POCuser01"
+sp_pass: "Admin@123"
+orchestrator_ip: "172.22.140.12"
+verify_tls: false
+
+target_hostname: "POD01-Branch01-Aruba-SDWAN01"
+tunnel_name: "ThirdParty_Zscaler_INET1_Primary_Z1"
+
+ec_host: "172.22.184.19"
+ec_username: "admin2"
+ec_password: "Admin@123"
+
+ec_command1: "ping -I wan0 8.8.8.8 -c 10"
+ec_command2: "ping -I wan0 gateway.zscalerthree.net -c 10"

@@ -1,0 +1,44 @@
+---
+
+- name: Get current CST epoch time (milliseconds)
+  ansible.builtin.command: >
+    date +%s%3N
+  environment:
+    TZ: America/Chicago
+  register: cst_now_epoch
+
+- name: Get CST epoch time 10 minutes ago (milliseconds)
+  ansible.builtin.command: >
+    date -d "10 minutes ago" +%s%3N
+  environment:
+    TZ: America/Chicago
+  register: cst_minus_10_epoch
+
+- name: Set CST time facts
+  ansible.builtin.set_fact:
+    cst_now_ms: "{{ cst_now_epoch.stdout }}"
+    cst_last_10_ms: "{{ cst_minus_10_epoch.stdout }}"
+
+- debug:
+    msg:
+      - "Current CST epoch(ms): {{ cst_now_ms }}"
+      - "Last 10 min CST epoch(ms): {{ cst_last_10_ms }}"
+
+- name: Fetch alarm status based on condition
+  ansible.builtin.uri:
+    validate_certs: no
+    url: "{{ sp_appliance_base }}/alarm/appliance"
+    method: POST
+    body_format: json
+    body:
+      nePks: ["{{ ne_pk }}"]
+      view: "active"
+      severity: ["critical"]  #majoR
+      startTime: "{{ cst_last_10_ms }}"
+      endTime: "{{ cst_now_ms }}"
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+    return_content: yes
+  register: alm_status
+

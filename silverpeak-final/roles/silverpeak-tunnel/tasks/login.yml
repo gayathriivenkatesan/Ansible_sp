@@ -1,0 +1,19 @@
+---
+- name: 101 Assert required vars
+  ansible.builtin.assert:
+    that:
+      - sp_appliance_base | length > 0
+      - sp_user | length > 0
+      - sp_pass | length > 0
+
+- name: 102 Login to Orchestrator
+  ansible.builtin.uri:
+    url: "{{ sp_appliance_base }}/authentication/login"
+    method: POST
+    body_format: json
+    body:
+      user: "{{ sp_user }}"
+      password: "{{ sp_pass }}"
+    validate_certs: "{{ validate_tls }}"
+    status_code: [200, 204]
+  register: login_resp

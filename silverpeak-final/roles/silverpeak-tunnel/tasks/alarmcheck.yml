@@ -1,0 +1,119 @@
+---
+- name: Get current UTC epoch time (milliseconds)
+  ansible.builtin.command: date +%s%3N
+  register: utc_now_epoch
+
+- name: Get UTC epoch time 10 minutes ago (milliseconds)
+  ansible.builtin.command: date -d "24 hours ago" +%s%3N   #1 hour ago
+  register: utc_minus_10_epoch
+
+- name: Set UTC time facts
+  ansible.builtin.set_fact:
+    utc_now_ms: "{{ utc_now_epoch.stdout | int }}"
+    utc_last_10_ms: "{{ utc_minus_10_epoch.stdout | int }}"
+
+- name: Show UTC time window
+  debug:
+    msg:
+      - "UTC now (ms): {{ utc_now_ms }}"
+      - "UTC last 10 min (ms): {{ utc_last_10_ms }}"
+
+- name: Fetch last 10 minutes critical alarms from SilverPeak
+  ansible.builtin.uri:
+    validate_certs: no
+    #url: "{{ sp_appliance_base }}/alarm/appliance" #?nePks={{ ne_pk }}&view=active&severity=critical"
+    url: "{{ sp_appliance_base }}/alarm/appliance?view=active&severity=critical"
+    method: POST
+    body_format: json
+    body:
+      nePks: ["{{ ne_pk }}"]
+      #startTime: "{{ utc_last_10_ms }}"
+      #endTime: "{{ utc_now_ms }}"
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+      Content-Type: application/json
+    return_content: yes
+  register: alm_status
+
+
+- name: Count critical alarms
+  set_fact:
+    critical_alarm_count: "{{ alm_status.json | length }}"
+
+- name: Show warning alarm count
+  debug:
+    msg: "Total active critical alarms: {{ critical_alarm_count }}"
+
+- name: Fetch the warning alarm  once critical alarm is not found
+  block:
+    
+    - name: fetch the warning alarm
+      ansible.builtin.uri:
+        validate_certs: no
+        #url: "{{ sp_appliance_base }}/alarm/appliance" #?nePks={{ ne_pk }}&view=active&severity=critical"
+        url: "{{ sp_appliance_base }}/alarm/appliance?view=active&severity=warning"
+        method: POST
+        body_format: json
+        body:
+          nePks: ["{{ ne_pk }}"]
+        headers:
+          cookie: "{{ login_resp.set_cookie }}"
+          X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+          Content-Type: application/json
+        return_content: yes
+      register: alm_status1
+
+    - name: print the warning alarm
+      debug:
+        msg: "{{ alm_status1 }}"
+
+    - name: Filter IPSLA alarms by source
+      set_fact:
+        ipsla_alarms: >-
+          {{
+            alm_status1.json
+            | default([])
+            | selectattr('source', 'equalto', 'IPSLA')
+            | list
+          }}
+
+    - name: Fetching alarm based on IPSLA 
+      debug:
+        var: ipsla_alarms
+
+    - name: Count warning alarm
+      set_fact:
+        warning_alarm_count: "{{ ipsla_alarms | length }}"
+
+   
+    - name: SHow the alarm count
+      debug:
+        msg: "Total active alarm count: {{ warning_alarm_count }}"
+
+  when: critical_alarm_count | int == 2 #0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

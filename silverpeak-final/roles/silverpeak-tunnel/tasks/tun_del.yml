@@ -1,0 +1,21 @@
+---
+- name: Delete passthrough tunnel
+  ansible.builtin.uri:
+    #url: "https://{{ sp_appliance_base }}/appliances/{{ ne_pk }}/passthrough-tunnels/{{ tun_obj.id }}"
+    url: "https://{{ orchestrator_ip }}/gms/appliances/{{ ne_pk }}/passthrough-tunnels/{{ tun_obj.id }}"
+    method: DELETE
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+    #user: "{{ sp_user }}"
+    #password: "{{ sp_pass }}"
+    force_basic_auth: true
+    validate_certs: "{{ validate_tls }}"
+    follow_redirects: all
+    #validate_certs: false
+    status_code: [200, 204]
+  register: tunn_state
+
+- debug:
+    msg: "{{ tunn_state }}"
+

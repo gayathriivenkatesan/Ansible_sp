@@ -1,0 +1,22 @@
+---
+- name: 301 Check SSH connectivity to Silver Peak
+  ansible.builtin.set_fact:
+    sp_ssh_ok: >-
+      {{
+        '' | sp_ssh_connectivity(
+          ec_host,
+          ec_username,
+          ec_password
+        )
+      }}
+
+- name: 302 Show connectivity result
+  ansible.builtin.debug:
+    msg: "SSH connectivity to Silver Peak is OK"
+  when: sp_ssh_ok
+
+- name: Abort if SSH connectivity failed
+  ansible.builtin.fail:
+    msg: "Unable to establish SSH connectivity to Silver Peak device"
+  when: sp_ssh_ok is not defined
+

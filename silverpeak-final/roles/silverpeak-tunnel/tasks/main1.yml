@@ -1,0 +1,121 @@
+---
+- name: Silver Peak Orchestrator Workflow
+  block:
+    - name: 100 Login to Orchestrator
+      include_tasks: login.yml
+
+    - name: 100A Log login status
+      ansible.builtin.debug:
+        msg: "Login response status: {{ login_resp.status }}"
+
+    - name: Main workflow (only if login succeeds)
+      block:
+
+        - name: Appliance lookup
+          include_tasks: appliance_lookup.yml
+
+        - name: Debug ne_pk
+          ansible.builtin.debug:
+            var: ne_pk
+
+        - name: Fail if appliance lookup failed
+          ansible.builtin.fail:
+            msg: "Appliance lookup failed; ne_pk not found"
+          when: ne_pk is not defined
+
+        - name: 300 Taking SSH to EdgeConnect
+          include_tasks: ssh_conn.yml
+
+        - name: Print SSH connectivity result
+          ansible.builtin.debug:
+            msg: "SSH connectivity OK: {{ sp_ssh_ok }}"
+
+        - name: Fail if SSH connectivity failed
+          ansible.builtin.fail:
+            msg: "SSH connectivity to EdgeConnect failed"
+          when: sp_ssh_ok is not defined or not sp_ssh_ok
+
+        - name: Checking WAN0 Interface
+          block:
+            - name: Checking tunnel status
+              include_tasks: interface.yml
+
+            - name: Debug WAN0 object
+              ansible.builtin.debug:
+                var: wan0_obj
+
+            - name: Fail if WAN0 object is missing
+              ansible.builtin.fail:
+                msg: "WAN0 interface object not found share audit logs"
+              when: wan0_obj is not defined
+
+            - name: Log interface active state
+              ansible.builtin.debug:
+                msg: "Interface {{ wan0_obj.name | default('WAN0') }} is active with oper={{ wan0_obj.oper }}"
+              when:
+                - wan0_obj is defined
+                - wan0_obj.oper | default(false)
+
+            - name: Performing ping check troubleshooting 
+              block:
+                - name: If interface is active proceed with diagnostics
+                  include_tasks: ssh_diagnostics.yml
+                
+                #need to debug var ecoutput2 and 3 .and in wen condition if both of them are zer then proceed with alarm condition
+                - name: Show WAN Loss percent output
+                  ansible.builtin.debug:
+                    var: ec_cli_output2
+          
+                - name: Show Zscaler Loss percent output
+                  ansible.builtin.debug:
+                    var: ec_cli_output3
+                
+                - name: Normalize loss values
+                  ansible.builtin.set_fact:
+                    wan_loss: "{{ ec_cli_output2 | float }}"
+                    zscaler_loss: "{{ ec_cli_output3 | float }}"
+ 
+                - name: Alarm validation
+                  block:
+                    - name: Include alarm tasks
+                      ansible.builtin.include_tasks: fetchalarm.yml
+
+                        #- name: Show alarm status
+                        #ansible.builtin.debug:
+                        #msg: "{{ alm_status }}"
+                  when: wan_loss == 0 #and zscaler_loss == 0
+    
+                - name: Next task (should be excluded if both losses are zero)
+                  ansible.builtin.debug:
+                    msg: "Server and URL  is not pingable"
+                  when:  wan_loss != 0 #and zscaler_loss != 0  
+              when:
+                - wan0_obj is defined
+                - wan0_obj.oper | default(false)
+
+          when:
+            - ne_pk is defined
+            - sp_ssh_ok is defined
+            - sp_ssh_ok
+
+      when: login_resp.status == 200
+
+      rescue:
+        - name: Handle workflow failure
+          ansible.builtin.debug:
+            msg: >
+              Workflow failed after successful login.
+              Status: {{ login_resp.status }}
+
+      always:
+        - name: Logout from Orchestrator
+          include_tasks: logout.yml
+          when: login_resp is defined and login_resp.status == 200
+
+    - name: 100B Login failure path
+      ansible.builtin.debug:
+        msg: >
+          Login failed with status {{ login_resp.status }}.
+          Routing execution to final assignment group.
+      when: login_resp.status != 200
+

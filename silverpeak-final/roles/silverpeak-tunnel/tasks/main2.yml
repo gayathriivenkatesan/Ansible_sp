@@ -1,0 +1,330 @@
+---
+- name: Silver Peak Orchestrator Workflow
+  block:
+
+    # =========================================================
+    # 100 - Login
+    # =========================================================
+    - name:  Login to Orchestrator
+      ansible.builtin.include_tasks: login.yml
+
+    - name:  Log login status
+      ansible.builtin.debug:
+        msg: "Login response status: {{ login_resp.status }}"
+
+
+    # =========================================================
+    # Main workflow (only if login succeeds)
+    # =========================================================
+    - name: Main workflow (only if login succeeds)
+      block:
+
+        # -----------------------------------------------------
+        # 200 - Appliance lookup
+        # -----------------------------------------------------
+        - name: Appliance lookup
+          ansible.builtin.include_tasks: appliance_lookup.yml
+
+        - name: Debug ne_pk
+          ansible.builtin.debug:
+            var: ne_pk
+
+        - name: Fail if appliance lookup failed
+          ansible.builtin.fail:
+            msg: "Appliance lookup failed; ne_pk not found"
+          when: ne_pk is not defined
+
+
+        # -----------------------------------------------------
+        # 300 - SSH connectivity
+        # -----------------------------------------------------
+        - name: Taking SSH to EdgeConnect
+          ansible.builtin.include_tasks: ssh_conn.yml
+
+        - name: Print SSH connectivity result
+          ansible.builtin.debug:
+            msg: "SSH connectivity OK: {{ sp_ssh_ok }}"
+
+        - name: Fail if SSH connectivity failed
+          ansible.builtin.fail:
+            msg: "SSH connectivity to EdgeConnect failed"
+          when: sp_ssh_ok is not defined or not sp_ssh_ok
+
+
+        # -----------------------------------------------------
+        # 400 - WAN Interface Validation
+        # -----------------------------------------------------
+        - name: Checking WAN0 Interface
+          block:
+
+            - name: Checking tunnel status
+              ansible.builtin.include_tasks: interface.yml
+
+            - name: Debug WAN0 object
+              ansible.builtin.debug:
+                var: wan0_obj
+
+            - name: Fail if WAN0 object is missing
+              ansible.builtin.fail:
+                msg: "WAN0 interface object not found. Share audit logs."
+              when: wan0_obj is not defined
+
+            - name: Log interface active state
+              ansible.builtin.debug:
+                msg: "Interface {{ wan0_obj.name | default('WAN0') }} is active with oper={{ wan0_obj.oper }}"
+              when:
+                - wan0_obj is defined
+                - wan0_obj.oper | default(false)
+
+
+            # -------------------------------------------------
+            # 500 - Diagnostics & Alarm Validation
+            # -------------------------------------------------
+            - name: Performing ping check troubleshooting
+              block:
+
+                - name: Run SSH diagnostics
+                  ansible.builtin.include_tasks: ssh_diagnostics.yml
+
+                - name: Show WAN loss percent output
+                  ansible.builtin.debug:
+                    var: ec_cli_output2
+
+                - name: Show Zscaler loss percent output
+                  ansible.builtin.debug:
+                    var: ec_cli_output3
+
+                - name: Normalize loss values
+                  ansible.builtin.set_fact:
+                    wan_loss: "{{ ec_cli_output2 | float }}"
+                    zscaler_loss: "{{ ec_cli_output3 | float }}"
+
+
+                # ---------------------------------------------
+                # Alarm validation (only when loss = 0)
+                # ---------------------------------------------
+                - name: Alarm validation
+                  block:
+
+                    - name: Run SilverPeak alarm check
+                      ansible.builtin.include_tasks: alarmfetch.yml
+
+                    - name: Show alarm summary
+                      ansible.builtin.debug:
+                        msg:
+                          - "Critical alarms: {{ critical_alarm_count }}"
+                          - "Warning alarms (IPSLA): {{ warning_alarm_count }}"
+
+
+                    # -----------------------------------------
+                    # CASE 1: Critical > 0 → Route to TEAM
+                    # -----------------------------------------
+                    - name: Route ticket to primary team
+                      block:
+                        - name: Log routing
+                          ansible.builtin.debug:
+                            msg: "Routing ticket to PRIMARY TEAM (Critical alarms present)"
+
+                        # Ticketing API call here
+
+                        - name: Stop execution
+                          ansible.builtin.meta: end_play
+                      when: critical_alarm_count | int > 2
+
+
+                    # -----------------------------------------
+                    # CASE 2: Critical = 0 & Warning = 0
+                    # -----------------------------------------
+                    - name: Route ticket to last assignment group
+                      block:
+                        - name: Log routing
+                          ansible.builtin.debug:
+                            msg: "CLOSING A TICKET DOUBT IN THE WORKFLOW"
+
+                        # Ticketing API call here
+
+                        - name: Stop execution
+                          ansible.builtin.meta: end_play
+                      when:
+                        - critical_alarm_count | int == 0
+                        - warning_alarm_count | int == 0
+
+
+                    # -----------------------------------------
+                    # CASE 3: Critical = 0 & Warning > 0
+                    # -----------------------------------------
+                    - name: Continue workflow (Warnings present)
+                      block:
+                        - name: Warning alarm detected 
+                          ansible.builtin.debug:
+                            msg: "Warnings detected. Proceeding with ping diagnostics task."
+
+                        # -------------------------------------------------
+                        # 500 - Rediagnostics & Alarm Validation
+                        # -------------------------------------------------
+                        - name: Run SSH diagnostics
+                          ansible.builtin.include_tasks: ssh_diagnostics.yml
+
+                        - name: Show WAN loss percent output
+                          ansible.builtin.debug:
+                            var: ec_cli_output2
+
+                        - name: Show Zscaler loss percent output
+                          ansible.builtin.debug:
+                            var: ec_cli_output3
+
+                        - name: Normalize loss values
+                          ansible.builtin.set_fact:
+                            wan_loss1: "{{ ec_cli_output2 | float }}"
+                            zscaler_loss1: "{{ ec_cli_output3 | float }}"
+
+                        # ---------------------------------------------------
+                        # Checking Alarm again After Rediagnostics
+                        # ---------------------------------------------------
+                        - name: Alarm status rechecking 
+                          block:
+                            - name: Run SilverPeak alarm check
+                              ansible.builtin.include_tasks: alarmfetch.yml
+
+                            - name: Show alarm summary
+                              ansible.builtin.debug:
+                                msg:
+                                  - "Critical alarms: {{ critical_alarm_count }}"
+                                  - "Warning alarms (IPSLA): {{ warning_alarm_count }}"
+
+                            # -----------------------------------------
+                            # CASE 1: Critical > 0 → Route to TEAM
+                            # -----------------------------------------
+                            - name: Route ticket to primary team
+                              block:
+                                - name: Log routing
+                                  ansible.builtin.debug:
+                                    msg: "Routing ticket to PRIMARY TEAM (Critical alarms present)"
+  
+                                # Ticketing API call here
+    
+                                - name: Stop execution
+                                  ansible.builtin.meta: end_play
+                              when: critical_alarm_count | int > 2
+
+                            # -----------------------------------------
+                            # CASE 2: Critical = 0 & Warning = 0
+                            # -----------------------------------------
+                            - name: Route ticket to last assignment group
+                              block:
+                                - name: Log routing
+                                  ansible.builtin.debug:
+                                    msg: "CLOSING A TICKET DOUBT IN THE WORKFLOW"
+
+                                # Ticketing API call here
+
+                                - name: Stop execution
+                                  ansible.builtin.meta: end_play
+                              when:
+                                - critical_alarm_count | int == 0
+                                - warning_alarm_count | int == 0
+
+                            # -----------------------------------------
+                            # CASE 3: Critical = 0 & Warning > 0
+                            # -----------------------------------------
+                            - name: Continue workflow (Warnings present)
+                              block:
+                                - name: Warning alarm detected
+                                  ansible.builtin.debug:
+                                    msg: "Warnings detected. Proceeding with bouncing diagnostics task."
+
+                                #proceed with tunnel bouncing task
+                                - name: Run SilverPeak alarm check
+                                  ansible.builtin.include_tasks: tunnel_lookup.yml
+
+                                - name: Bounce the tunnel 
+                                  block: 
+                                    - name: Delete the tunnel using id
+                                      ansible.builtin.include_tasks: tun_del.yml                                  
+                                  when:
+                                    - tun_obj is defined
+                                    - tun_obj.id is defined
+
+                                - name: deletion failed
+                                  debug:
+                                    msg: "Unable to find the tunnelid for the provided tunnel"
+                                  when:
+                                    - tun_obj is not defined
+                                    - tun_obj.id is not defined
+                              when:
+                                - critical_alarm_count | int == 2
+                                - warning_alarm_count | int > 0 
+
+                          when: 
+                            - wan_loss1 | float == 0
+                            - zscaler_loss1 | float == 0
+
+                        # ---------------------------------------------
+                        # Loss detected → No alarm validation2
+                        # ---------------------------------------------
+                        - name: Loss detected – server or URL not reachable
+                          ansible.builtin.debug:
+                            msg: "Server or URL is not pingable in Rediagnostics"
+                          when:
+                            - wan_loss1 | float != 0 or zscaler_loss1 | float != 0
+
+                      when: 
+                        - critical_alarm_count | int == 2
+                        - warning_alarm_count | int > 0
+ 
+                  when:
+                    - wan_loss | float == 0
+                    - zscaler_loss | float == 0
+
+
+                # ---------------------------------------------
+                # Loss detected → No alarm validation1
+                # ---------------------------------------------
+                - name: Loss detected – server or URL not reachable
+                  ansible.builtin.debug:
+                    msg: "Server or URL is not pingable"
+                  when:
+                    - wan_loss | float != 0 or zscaler_loss | float != 0
+
+              when:
+                - wan0_obj is defined
+                - wan0_obj.oper | default(false)
+
+          when:
+            - ne_pk is defined
+            - sp_ssh_ok is defined
+            - sp_ssh_ok
+
+
+      when: login_resp.status == 200
+
+
+      # =====================================================
+      # Error Handling after login success
+      # =====================================================
+      rescue:
+        - name: Handle workflow failure
+          ansible.builtin.debug:
+            msg: >
+              Workflow failed after successful login.
+              Status: {{ login_resp.status }}
+
+
+      # =====================================================
+      # Always logout
+      # =====================================================
+      always:
+        - name: Logout from Orchestrator
+          ansible.builtin.include_tasks: logout.yml
+          when: login_resp is defined and login_resp.status == 200
+
+
+    # =========================================================
+    # Login failure path
+    # =========================================================
+    - name: Login failure path
+      ansible.builtin.debug:
+        msg: >
+          Login failed with status {{ login_resp.status }}.
+          Routing execution to final assignment group.
+      when: login_resp.status != 200

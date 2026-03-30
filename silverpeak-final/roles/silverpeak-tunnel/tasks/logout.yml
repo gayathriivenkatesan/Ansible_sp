@@ -1,0 +1,15 @@
+---
+- name: Logout from Orchestrator
+  ansible.builtin.uri:
+    url: "{{ sp_appliance_base }}/authentication/logout"
+    method: GET
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+    validate_certs: no
+    status_code: [200, 204]
+      #ignore_errors: true
+  register: logout
+
+- debug:
+    var: logout

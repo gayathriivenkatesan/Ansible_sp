@@ -1,0 +1,234 @@
+---
+- name: Silver Peak Orchestrator Workflow
+  block:
+
+    # =========================================================
+    # Initialize workflow log
+    # =========================================================
+    - name: Initialize workflow log file
+      ansible.builtin.set_fact:
+        # workflow_log: "/home/pocuser01/sp_task/logs/silverpeak_{{ ansible_date_time.iso8601 }}.log"
+        #workflow_log: "{{ ansible_date_time.iso8601 }}.log"
+        #workflow_log: "/home/pocuser01/sp_task/logs/silverpeak_{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}.log"
+        workflow_log: "/home/pocuser01/sp_task/silverpeak-final/logs/output.log"
+
+    - name: Log workflow start
+      ansible.builtin.lineinfile:
+        path: "{{ workflow_log }}"
+        line: "[{{ ansible_date_time.iso8601 }}] WORKFLOW STARTED"
+        create: true
+
+
+    # =========================================================
+    # 100 - Login
+    # =========================================================
+    - name: Login to Orchestrator
+      ansible.builtin.include_tasks: login.yml
+
+    - name: Log login status
+      ansible.builtin.lineinfile:
+        path: "{{ workflow_log }}"
+        line: "[{{ ansible_date_time.iso8601 }}] Login status: {{ login_resp.status }}"
+
+
+    # =========================================================
+    # Main workflow (only if login succeeds)
+    # =========================================================
+    - name: Main workflow (only if login succeeds)
+      block:
+
+        # -----------------------------------------------------
+        # 200 - Appliance lookup
+        # -----------------------------------------------------
+        - name: Appliance lookup
+          ansible.builtin.include_tasks: appliance_lookup.yml
+
+        - name: Log appliance lookup result
+          ansible.builtin.lineinfile:
+            path: "{{ workflow_log }}"
+            line: "[{{ ansible_date_time.iso8601 }}] Appliance ne_pk: {{ ne_pk | default('NOT_FOUND') }}"
+
+        - name: Fail if appliance lookup failed
+          ansible.builtin.fail:
+            msg: "Appliance lookup failed; ne_pk not found"
+          when: ne_pk is not defined
+
+
+        # -----------------------------------------------------
+        # 300 - SSH connectivity
+        # -----------------------------------------------------
+        - name: Taking SSH to EdgeConnect
+          ansible.builtin.include_tasks: ssh_conn.yml
+
+        - name: Log SSH connectivity
+          ansible.builtin.lineinfile:
+            path: "{{ workflow_log }}"
+            line: "[{{ ansible_date_time.iso8601 }}] SSH connectivity: {{ sp_ssh_ok }}"
+
+
+        - name: Handle SSH connectivity failure
+          block:
+            - name: Log SSH failure reason
+              ansible.builtin.debug:
+                msg: "SSH connectivity to EdgeConnect failed. Collecting audit logs and alarms."
+
+            - name: Collect audit logs
+              ansible.builtin.include_tasks: auditlogs.yml
+              vars:
+                audit_reason: "SSH connectivity to EdgeConnect failed"
+
+            - name: Collect alarm details
+              ansible.builtin.include_tasks: alarmfetch.yml
+
+          when:
+            - sp_ssh_ok is not defined or not sp_ssh_ok
+            - ne_pk is defined
+
+        - name: Fail if SSH connectivity failed
+          ansible.builtin.fail:
+            msg: "SSH connectivity to EdgeConnect failed"
+          when: 
+            - sp_ssh_ok is not defined or not sp_ssh_ok
+            - ne_pk is not defined
+
+        # -----------------------------------------------------
+        # 400 - WAN Interface Validation
+        # -----------------------------------------------------
+        - name: Checking WAN0 Interface
+          block:
+
+            - name: Checking tunnel status
+              ansible.builtin.include_tasks: interface.yml
+
+            - name: Log WAN0 status
+              ansible.builtin.lineinfile:
+                path: "{{ workflow_log }}"
+                line: "[{{ ansible_date_time.iso8601 }}] WAN0 oper state: {{ wan0_obj.oper | default('UNKNOWN') }}"
+
+            - name: Fail if WAN0 object is missing
+              ansible.builtin.fail:
+                msg: "WAN0 interface object not found. Share audit logs."
+              when: wan0_obj is not defined
+
+
+            # -------------------------------------------------
+            # 500 - Diagnostics & Alarm Validation
+            # -------------------------------------------------
+            - name: Performing diagnostics
+              block:
+
+                - name: Run SSH diagnostics
+                  ansible.builtin.include_tasks: ssh_diagnostics.yml
+
+                - name: Normalize loss values
+                  ansible.builtin.set_fact:
+                    wan_loss: "{{ ec_cli_output2 | float }}"
+                    zscaler_loss: "{{ ec_cli_output3 | float }}"
+
+                - name: Log loss values
+                  ansible.builtin.lineinfile:
+                    path: "{{ workflow_log }}"
+                    line: >
+                      [{{ ansible_date_time.iso8601 }}]
+                      WAN loss={{ wan_loss }},
+                      Zscaler loss={{ zscaler_loss }}
+
+
+                # ---------------------------------------------
+                # Alarm validation (only when loss = 0)
+                # ---------------------------------------------
+                - name: Alarm validation
+                  block:
+
+                    - name: Run SilverPeak alarm check
+                      ansible.builtin.include_tasks: alarmfetch.yml
+
+                    - name: Log alarm summary
+                      ansible.builtin.lineinfile:
+                        path: "{{ workflow_log }}"
+                        line: >
+                          [{{ ansible_date_time.iso8601 }}]
+                          Critical={{ critical_alarm_count }},
+                          Warning={{ warning_alarm_count }}
+
+
+                    # -----------------------------------------
+                    # CASE 3: Critical = 0 & Warning > 0
+                    # -----------------------------------------
+                    - name: Continue workflow (Warnings present)
+                      block:
+
+                        - name: Run tunnel lookup
+                          ansible.builtin.include_tasks: tunnel_lookup.yml
+
+                        - name: Log tunnel lookup result
+                          ansible.builtin.lineinfile:
+                            path: "{{ workflow_log }}"
+                            line: >
+                              [{{ ansible_date_time.iso8601 }}]
+                              Tunnel found={{ tun_obj.id | default('NOT_FOUND') }}
+
+                        - name: Delete the tunnel
+                          ansible.builtin.include_tasks: tun_del.yml
+                          when:
+                            - tun_obj is defined
+                            - tun_obj.id is defined
+
+                        - name: Log tunnel deletion result
+                          ansible.builtin.lineinfile:
+                            path: "{{ workflow_log }}"
+                            line: >
+                              [{{ ansible_date_time.iso8601 }}]
+                              Tunnel delete attempt completed
+
+                      when:
+                        - critical_alarm_count | int == 2
+                        - warning_alarm_count | int > 0
+
+                  when:
+                    - wan_loss == 0
+                    - zscaler_loss == 0
+
+              when:
+                - wan0_obj is defined
+                - wan0_obj.oper | default(false)
+
+          when:
+            - ne_pk is defined
+            - sp_ssh_ok
+
+
+      when: login_resp.status == 200
+
+
+      # =====================================================
+      # Error Handling
+      # =====================================================
+      rescue:
+        - name: Log workflow failure
+          ansible.builtin.lineinfile:
+            path: "{{ workflow_log }}"
+            line: "[{{ ansible_date_time.iso8601 }}] WORKFLOW FAILED AFTER LOGIN"
+
+      # =====================================================
+      # Always logout
+      # =====================================================
+      always:
+        - name: Logout from Orchestrator
+          ansible.builtin.include_tasks: logout.yml
+
+        - name: Log workflow end
+          ansible.builtin.lineinfile:
+            path: "{{ workflow_log }}"
+            line: "[{{ ansible_date_time.iso8601 }}] WORKFLOW COMPLETED"
+
+
+    # =========================================================
+    # Login failure path
+    # =========================================================
+    - name: Log login failure
+      ansible.builtin.lineinfile:
+        path: "{{ workflow_log }}"
+        line: "[{{ ansible_date_time.iso8601 }}] LOGIN FAILED: {{ login_resp.status }}"
+      when: login_resp.status != 200
+

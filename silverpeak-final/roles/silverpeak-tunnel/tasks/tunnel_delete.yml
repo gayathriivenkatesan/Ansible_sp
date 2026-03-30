@@ -1,0 +1,14 @@
+---
+- name: Delete passthrough tunnel
+  ansible.builtin.uri:
+    url: "{{ sp_appliance_base }}/tunnel/delete"
+    method: POST
+    validate_certs: false
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+    params:
+      id: "{{ tun_obj.id }}"
+      ne_pk: "{{ ne_pk }}"
+    status_code: [200, 204]
+  when: tun_obj.id is defined

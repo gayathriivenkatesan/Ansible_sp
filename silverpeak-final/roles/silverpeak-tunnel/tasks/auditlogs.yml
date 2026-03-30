@@ -1,0 +1,58 @@
+---
+# Last 10mins - For a given Appliance  - Audit Logs
+
+- name: Generate epoch times using Python
+  shell: |
+    python3 - <<EOF
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    print(int(now.timestamp())*1000,
+          int((now - timedelta(minutes=5)).timestamp())*1000,
+          int((now - timedelta(minutes=10)).timestamp())*1000)
+    EOF
+  register: epoch_output
+  changed_when: false
+
+- name: Parse epoch values
+  set_fact:
+    epoch_now: "{{ epoch_output.stdout.split()[0] }}"
+    epoch_minus_5: "{{ epoch_output.stdout.split()[1] }}"
+    epoch_minus_10: "{{ epoch_output.stdout.split()[2] }}"
+
+- name: Appliance AuditLog (GET /action?startTime=&endTIme=)
+  ansible.builtin.uri:
+    validate_certs: no
+    # ttps://172.22.140.12/gms/rest/action?startTime=1770713100000&endTime=1770799559000&limit=10&logLevel=1
+    # https://172.22.140.12/gms/rest/action?limit=500&logLevel=1&username=&appliance=&startTime=1770713100000&endTime=1770799559000&_=1770799517533
+    url: "https://{{ orchestrator_ip }}/gms/rest/action?limit=20&logLevel=1&startTime={{epoch_minus_5}}&endTime={{ epoch_now }}"
+    #url: "https://{{ orchestrator_ip }}/gms/rest/action?limit=500&logLevel=1&startTime=1770713100000&endTime=1770799559000"
+    headers:
+      cookie: "{{ orch_login.set_cookie }}"
+      X-XSRF-TOKEN: "{{ orch_login.cookies.orchCsrfToken }}"
+      Accept: application/json
+    return_content: yes
+    method: GET
+  register: appliance_auditlog
+
+- set_fact:
+    filtered_logs: "{{ appliance_auditlog.json | selectattr('nepk','equalto', discovered_nePk) | list }}"
+
+- name: Sort filtered logs by startTime descending
+  set_fact:
+    sorted_logs: "{{ filtered_logs | sort(attribute='startTime', reverse=true) }}"
+
+- name: print auditlogs
+  debug:
+    var: sorted_logs 
+
+
+      #- name: Write Audit Logs
+      #blockinfile:
+      #path: "{{ output_file }}"
+      #block: "{{ lookup('template', 'audit_report.j2') }}"
+      #marker: ""
+      #insertafter: EOF
+
+
+
+

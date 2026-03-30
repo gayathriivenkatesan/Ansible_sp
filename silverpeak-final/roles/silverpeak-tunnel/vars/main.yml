@@ -1,0 +1,8 @@
+---
+sp_appliance_base: "{{ lookup('env','SP_APPLIANCE_BASE') }}"
+sp_user: "{{ lookup('env','SP_USER') }}"
+sp_pass: "{{ lookup('env','SP_PASS') }}"
+
+ec_host: "172.22.184.19"
+ec_username: "admin2"
+ec_password: "Admin@123"

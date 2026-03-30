@@ -1,0 +1,12 @@
+---
+- name: Silver Peak Tunnel Delete + SSH Validation
+  hosts: localhost
+  #gather_facts: false
+  gather_facts: True
+
+  vars_files:
+    - input_vars.yml
+
+  roles:
+    - silverpeak-tunnel
+

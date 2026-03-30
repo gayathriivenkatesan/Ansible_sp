@@ -1,0 +1,108 @@
+---
+# ============================================================
+# SilverPeak Alarm Check
+# - Sets critical_alarm_count
+# - Sets warning_alarm_count (IPSLA only)
+# ============================================================
+
+- name: Get current UTC epoch time (ms)
+  ansible.builtin.command: date -u +%s%3N
+  register: utc_now_epoch
+  changed_when: false
+
+- name: Get UTC epoch time 10 minutes ago (ms)
+  ansible.builtin.command: date -u -d "10 minutes ago" +%s%3N
+  register: utc_minus_10_epoch
+  changed_when: false
+
+- name: Set UTC time facts
+  ansible.builtin.set_fact:
+    utc_now_ms: "{{ utc_now_epoch.stdout | int }}"
+    utc_last_10_ms: "{{ utc_minus_10_epoch.stdout | int }}"
+
+# ------------------------------------------------------------
+# Fetch CRITICAL alarms
+# ------------------------------------------------------------
+- name: Fetch active CRITICAL alarms
+  ansible.builtin.uri:
+    validate_certs: false
+    url: "{{ sp_appliance_base }}/alarm/appliance?view=active&severity=critical"
+    method: POST
+    body_format: json
+    body:
+      nePks:
+        - "{{ ne_pk }}"
+    headers:
+      Cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+      Content-Type: application/json
+    return_content: true
+  register: critical_alarm_resp
+
+- name: Set CRITICAL alarm count
+  ansible.builtin.set_fact:
+    critical_alarm_count: "{{ critical_alarm_resp.json | default([]) | length }}"
+
+# ------------------------------------------------------------
+# Fetch WARNING alarms only when no CRITICAL alarms exist
+# ------------------------------------------------------------
+- name: Fetch WARNING alarms (IPSLA only)
+  block:
+
+    - name: Fetch active WARNING alarms
+      ansible.builtin.uri:
+        validate_certs: false
+        url: "{{ sp_appliance_base }}/alarm/appliance?view=active&severity=warning"
+        method: POST
+        body_format: json
+        body:
+          nePks:
+            - "{{ ne_pk }}"
+        headers:
+          Cookie: "{{ login_resp.set_cookie }}"
+          X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+          Content-Type: application/json
+        return_content: true
+      register: warning_alarm_resp
+     
+    - name: Displaying warning alarm 
+      debug:
+        msg: "{{ warning_alarm_resp }}"
+    
+
+    - name: Filter by IPSLA
+      ansible.builtin.set_fact:
+        ipsla_alarms: >-
+          {{
+           warning_alarm_resp.json
+           | default([])
+           | selectattr(
+               'description',
+               'defined'
+             )
+           | select(
+               'match',
+               '(?i).*(ip sla|ipsla|down).*'
+             )
+           | list
+          }}
+
+    - name: printingthe warning alarm list after filter 
+      debug:
+        msg: "{{ ipsla_alarms }}"
+
+    - name: Set WARNING alarm count
+      ansible.builtin.set_fact:
+        warning_alarm_count: "{{ ipsla_alarms | length }}"
+
+  when: critical_alarm_count | int == 2
+
+# ------------------------------------------------------------
+# Safety defaults (VERY IMPORTANT)
+# ------------------------------------------------------------
+- name: Ensure alarm facts always exist
+  ansible.builtin.set_fact:
+    critical_alarm_count: "{{ critical_alarm_count | default(0) }}"
+    warning_alarm_count: "{{ warning_alarm_count | default(0) }}"
+    ipsla_alarms: "{{ ipsla_alarms | default([]) }}"
+

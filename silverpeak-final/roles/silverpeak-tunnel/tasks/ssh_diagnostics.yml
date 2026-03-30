@@ -1,0 +1,66 @@
+---
+- name: Run WAN ping via Silver Peak SSH
+  ansible.builtin.set_fact:
+    ec_cli_output: >-
+      {{
+        '' | sp_ssh_cli(
+          ec_host,
+          ec_username,
+          ec_password,
+          ec_command1
+        )
+      }}
+
+- name: Run Zscaler ping via Silver Peak SSH
+  ansible.builtin.set_fact:
+    ec_cli_output1: >-
+      {{
+        '' | sp_ssh_cli(
+          ec_host,
+          ec_username,
+          ec_password,
+          ec_command2
+        )
+      }}
+
+- name: Show WAN ping output
+  ansible.builtin.debug:
+    var: ec_cli_output
+
+- name: Show Zscaler ping output
+  ansible.builtin.debug:
+    var: ec_cli_output1
+
+
+- name: Run WAN ping via Silver Peak identify loss
+  ansible.builtin.set_fact:
+    ec_cli_output2: >-
+      {{
+        '' | sp_ping_loss(
+          ec_host,
+          ec_username,
+          ec_password,
+          ec_command1
+        )
+      }}
+
+- name: Run Zscaler ping via Silver Peak identify loss
+  ansible.builtin.set_fact:
+    ec_cli_output3: >-
+      {{
+        '' | sp_ping_loss(
+          ec_host,
+          ec_username,
+          ec_password,
+          ec_command2
+        )
+      }}
+
+- name: Show WAN Loss percent output
+  ansible.builtin.debug:
+    var: ec_cli_output2
+
+- name: Show Zscaler Loss percent output
+  ansible.builtin.debug:
+    var: ec_cli_output3
+

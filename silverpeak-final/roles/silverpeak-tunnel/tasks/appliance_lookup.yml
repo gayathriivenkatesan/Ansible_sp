@@ -1,0 +1,15 @@
+---
+- name: 201 Fetch appliance inventory
+  ansible.builtin.uri:
+    url: "{{ sp_appliance_base }}/appliance?name.eq={{ target_hostname | urlencode }}"
+    method: GET
+    validate_certs: false
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+  register: appliance_inventory
+
+- name: 202 Set NEPK and appliance ID
+  ansible.builtin.set_fact:
+    ne_pk: "{{ appliance_inventory.json[0].nePk }}"
+    applianceid: "{{ appliance_inventory.json[0].applianceId }}"

@@ -1,0 +1,29 @@
+---
+- name: Fetch Interface status
+  ansible.builtin.uri:
+    validate_certs: no
+    url: "{{ sp_appliance_base }}/interfaceState?cached=false&nePk={{ ne_pk }}"
+    body_format: json
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+    return_content: yes
+    method: GET
+  register: inter_status
+ 
+- debug:
+    var: inter_status.json
+      
+- name: Extract the 'wan0' interface (array response)
+  ansible.builtin.set_fact:
+    wan0_obj: >-
+      {{ (inter_status.json['ifInfo'] | default([]))
+      | selectattr('ifname', 'equalto', 'wan0')
+      | list
+      | first | default({}) }}
+ 
+ 
+- name: Extract the wan0 status
+  ansible.builtin.debug:
+    var: wan0_obj.oper
+ 

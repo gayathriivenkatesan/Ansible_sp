@@ -1,0 +1,29 @@
+---
+- name: Query passthrough tunnels
+  ansible.builtin.uri:
+    url: "{{ sp_appliance_base }}/tunnels2/passThrough?srcNePk={{ ne_pk | urlencode }}"
+    method: GET
+    validate_certs: false
+    headers:
+      cookie: "{{ login_resp.set_cookie }}"
+      X-XSRF-TOKEN: "{{ login_resp.cookies.orchCsrfToken }}"
+  register: pt_query
+
+- name: Extract tunnel object
+  ansible.builtin.set_fact:
+    tun_obj: >-
+      {{
+        (pt_query.json[ne_pk] | default({}))
+        | dict2items
+        | map(attribute='value')
+        | selectattr('alias','equalto', tunnel_name)
+        | list | first | default({})
+      }}
+- name: Fetching the Tunnel ID using name
+  debug:
+    var: tun_obj
+
+- name: Fetching the Tunnel ID using name 
+  debug:
+    var: tun_obj.id 
+
