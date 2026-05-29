@@ -1,0 +1,433 @@
+
+https://www.google.com/search?q=ansible+tutorial+tamil&rlz=1C1GCEU_enIN1115IN1115&oq=ansible+tutorial+tamil&gs_lcrp=EgZjaHJvbWUyCggAEEUYFhgeGDkyCAgBEAAYFhge0gEINTc1M2owajeoAgiwAgHxBUqspC3cxrnN&sourceid=chrome&ie=UTF-8#fpstate=ive&vld=cid:717216b2,vid:aih9bTVnwls,st:0
+
+ansible -push based from central server manage all the servers terraform is also the same 
+
+inventory -server list 
+module -ansible module 
+ansible.cfg
+
+ubaunto 24 
+sudo apt update
+sudo apt install ansible -y
+ansible --version
+
+sudo useradd -m ansible (usernameis ansible eg)
+sudo passwd ansible
+sudo visudo 
+
+
+
+root (user access previlage)
+root  ALL=(ALL:ALL) ALL 
+ansible   ALL=(ALL:ALL) NOPASSWD: ALL (replace by pasting above instead of all we can restrict also /usr/sbin/vgcreate only run this command)
+
+sudo su - ansible (switch to user )
+
+generate key from controlnode
+
+{----stes to be performed on target server 
+
+ip a (hostname cmd in windows similar here take inet ip/24 is the hostip )
+ssh-keygen -t rsa
+cd .ssh
+ls -lrt 
+cat id rsa.pub
+ssh-copy-id -i id_rsa.pub ansibleid_rsa.pub
+ssh-copy-id -i id_rsa.pub ansible@192.168.56.12/24 (target hostipwhich you fetched above )
+
+ssh ansible @hostkey ip(its difficult to pass password)
+ssh ansible@targetip
+
+
+}
+
+centos10
+cat /etc/redhat-release
+sudo yum update 
+sudo yum install ansible
+
+(if ansible not found)
+sudo yum install epel-release -y
+sudo yum update 
+sudo yum install ansible-core
+ansible --version
+
+control node ssh enable 
+dedicated user create for ansible 
+password less authenticate 
+'ssh ansible@targetip'
+
+create a inventory in control node like etchost in Linux
+def inv path in ansible=etc/ansible/hosts/
+
+mkdir test 
+cd test 
+ls -lrt 
+vim inventorty 
+
+[ubunto]  --groupname
+ip1       -- hostname
+[centos]
+ip2 
+1.2.3.4 ansible_user=ansible ansible_port=22 ansible_connection=ssh or local
+1.2.3.4 ansible_user=g3
+
+[webapp : children] -parent
+ubunto    -child group
+centos
+
+ansible -i inventory all -m ping (from user)
+ansible -i inventory all -m ping -u ansible
+
+-u username
+-m module
+-i inventory
+
+ansible all -m ping  (also same)
+
+ansible inventory in google for reference
+ansible centos -m ping -u ansible
+ansible ubunto -u ansible -m command -a "lsb_reease -a"
+
+create a folder called pathching 
+create a file as inventory.txt and add the group host ,var
+ansible ubunto -u ansible -m command -a "sudo yum install -y http" (it will refer the project inventory)
+
+plugin available 
+aws sts get-caller-identity
+
+need to check how to install modules 
+ansible-inventory -i aws_ec2.yml --graph (or list) if you want to run a yaml file 
+
+configuration:
+
+
+/etc/ansible/ansible.cfg it is not a default file we need to create 
+create dir etc/ansible/
+ansible-config init --disabled > ansible.cfg
+sudo mv -f ansible.cfg /etc/ansible/
+
+ansible all -m ping -v (-v verify which config file it is refering)
+
+ansible all -->you can override
+server.txt 1.2.3.4
+ansible all -m ping -v -u ansible -i server.txt
+priority for run time variable
+
+ANSIBLE_CONFIG-->high priority env currentdirectory,home direct if not then go for defeulat
+cp -rf  modify the /etc/ansible/pathching
+ansible-config 
+we can create config for each projects 
+
+adhoc commands is used for simple execution 
+Need to create roles 
+
+
+install module 
+
+Yum install module name(8000+available)
+
+ansible-doc -l |grep -i copy (copy is the mod name)
+ansible-doc copy (will tell you how to use this module)
+
+= params are mandatory
+ansible all -u ansible -m copy -a "src=app.env dext=/tmp/" -v 
+-v will tell config file details
+-a argument 
+
+shell and command available if no module found 
+command will not allow to execute sub commands withpipe
+
+ansible all -u ansible -m command  -a "ls /tmp/" -v 
+ansible all -u ansible -m shell  -a "ls /tmp/" -v 
+
+ansible all -u ansible -m shell -a "cat /etc/passwd | grep -i ansible"(but command will not work )
+
+playbook yaml file
+
+ceo office ->sathuvachari 
+
+start with --- wen start writing yaml file 
+
+---
+- hosts: all or ubunto (mention group ,host etc..)
+  become: yes (run as sudo user) 
+  tasks:(next line 3space)
+    - name: Update repository(indent to task)
+      apt:(2space nxt line)
+	update_cache: yes
+
+    - name: Install apache
+      apt:(2space nxt line)
+	name:apache2
+	state: present
+
+    - name: copy to target
+      copy:(2space nxt line)
+	src: webdata/index.html
+	dest: /var/www/html/index.html
+
+    - name: service apache(restart)
+      service:(2space nxt line)
+	name:apache2
+	state: started
+ 
+
+alignment without name
+
+- tasks:
+    -apt
+
+---
+- hosts: all or ubunto (mention group ,host etc..)
+  become: yes (run as sudo user)
+  gather_facts: yes
+  vars:
+    app_name: apache2
+    service_name: apache2
+
+  tasks:(next line 3space)
+    - name: facts check
+      debug: 
+	msg: "{{ ansible_bios _version }}"
+        msg: "{{ ansible_cmdline['BOOT_IMAGE'] }}"
+   
+    - name: Update repository(indent to task)
+      apt:(2space nxt line)
+	update_cache: yes
+      
+
+    - name: Install apache
+      apt:(2space nxt line)
+	name: "{{ app_name }}" -->use jinja template
+	state: present
+
+you can pass as a file also 
+vars_file:
+  - var.yaml
+  - var2.yaml
+
+cat var2.yaml 
+vim var2.yaml
+
+inside file keep variable like this 
+app_name: apache
+webserver:appache
+
+
+save it as webtest.yaml
+
+to run playbook
+ansible-playbook (double tap will show the options available)
+ansible-playbook webtest.yaml --syntax-check (will check the syntax)
+ansible-playbook webtest.yaml --list--hosts (will check which all the host will be executed)
+ansible-playbook webtest.yaml --check(To check the sample output format -- dryrun)
+ansible-playbook webtest.yaml (to run deploy)
+
+
+#######Gather facts#########:
+
+ansible ubunto -m setup (it will gather target machine configuration)
+ansible ubunto -m setup  -a "filter=ansible_memory*" (it will gather target machine configuration)
+ansible 1.2.3.4 -m setup  -a "filter=ansible_memory*" (it will the target ip machine configuration)
+
+#############when #############:
+executing for different os based on when
+
+---
+- hosts: all or ubunto (mention group ,host etc..)
+  become: yes (run as sudo user)
+  gather_facts: yes
+  vars:
+    app_name: apache2
+    service_name: httpd
+
+
+  tasks:
+    - name: Install apache
+      apt:(2space nxt line)
+	name: "{{ app_name }}" -->use jinja template
+	state: present
+      when: ansible_facts["ansible_os_family"] == "Debian" #or give only os_family
+
+   - name: Install apache
+      yum:(2space nxt line)
+	name: "{{ service_name }}" -->use jinja template
+	state: present
+      when: ansible_facts["ansible_os_family"] == "RedHat" #or give only os_family
+
+#####loop ##############
+---
+- hosts: all or ubunto (mention group ,host etc..)
+  become: yes (run as sudo user)
+  gather_facts: yes
+
+  tasks:
+    - name: create file
+      file:
+	path: '/tmp/{{ item }}' -->use jinja template
+	state: touch
+      loop:
+        - file1.txt
+	- file2.txt
+	- file1.txt
+
+
+#####using both item and when#########
+---
+hosts: all or ubunto (mention group ,host etc..)
+become: yes (run as sudo user)F
+gather_facts: yes
+
+tasks:
+  - name: install multiple module
+    apt:
+      name: "{{ item }}" -->use jinja template
+      state: present
+    loop:
+      - git
+      - curl
+      - wget
+    when: ansible_facts["ansible_os_family"] == "Debian"
+
+
+
+{{"ansible_hostname"}} if you want to pass dynamic value from facts F
+
+#####differece between copy and template #######
+index.html
+
+content inside file
+Im inside the {{ansible_hostname}}
+
+if you template it will take the value 
+copy will simply copy
+
+
+---
+- hosts: all or ubunto (mention group ,host etc..)
+  become: yes (run as sudo user) 
+  tasks:
+    - name: copy to target 
+      copy:(2space nxt line)
+	src: webdata/index.html
+	dest: /var/www/html/index.html
+
+    - name: service apache(restart)
+      template:(2space nxt line)
+	name:apache2
+	state: started
+
+ 
+create-role 
+
+ansible-galaxy init rolename  -->to get default skelatol structure 
+
+sudo apt install tree
+cd dir to rolename and execute tree -->to see the structure
+
+ansible-galaxy roles 
+
+ansible-galaxy roles install rolename.username  --> u can find from ansible-galaxy if you want to download from online source 
+
+
+files:
+
+(i)keep any files -->py,text etc...
+index.html -->Hello world 
+
+(ii)tasks:
+config.yml
+install.yml
+restart.yml
+copy.yml 
+- copy:
+  src:index.html (from files)
+  dest:/vars/hello.html
+
+
+(iii)outside main.yml (renamed run.yml)
+---
+  hosts: group or hostname
+ - include_tasks:config.yml
+ - include_tasks:install.yml
+ - include_tasks:restart.yml
+ - include_tasks:copy.yml
+
+ansible-playbook run.yml --syntax-check
+ansible-playbook run.yml -u ansibleusername
+
+
+testserver
+user 
+password 
+api 
+api key
+
+auroba silver peak device 
+
+onboard->playbook->initiate
+
+cmds
+pod1
+
+notify and handlers if you use notify with the handlers name inside task it will do it 
+
+---
+- hosts:
+  become:
+  tasks:
+    - name:install 
+
+    - name:copy the file
+      copy:
+        src:
+        dest:
+      notify: 
+        - run servers
+
+ handlers:
+   -name: run servers
+    service:
+      name: apache2
+      started
+
+
+
+       
+           
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

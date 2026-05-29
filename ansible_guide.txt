@@ -1,0 +1,238 @@
+GIT link:
+https://github.com/BY-Product-Development/cld-pvt-automation-scripts/tree/SAUTO-13428/src
+https://github.com/enterprises/blueyonder-emu/sso
+
+meta data link:
+https://jda365.sharepoint.com/:x:/r/sites/iAutomateProd-Nonprodusecasesdetails/_layouts/15/doc2.aspx?sourcedoc=%7B541CA3B5-59E5-4F57-8C72-8CF1302141D8%7D&file=iAutomate_ManageRunbook_Template%20-BY-17-12-21%20(1)%20(1).xlsx&action=default&mobileredirect=true&cid=c9b0ecec-32a5-6f8d-a962-b196f2b87eb0&wdOrigin=TEAMS-WEB.p2p.p2p&wdExp=TEAMS-CONTROL&wdhostclicktime=1704711333647&web=1&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIxNDE1LzI0MDIxNTI4NjE2IiwiSGFzRmVkZXJhdGVkVXNlciI6ZmFsc2V9&xsdata=MDV8MDJ8fDVlMjhkNjRmMWRlMzQ2ZjZlZDZlMDhkZDg2MzUyYmZhfDJhYzM2Y2VlMDYxNzRhYzBiZWJmZTFjZTVkZmFiODZjfDB8MHw2Mzg4MTQyODUwODU3MzIyMDZ8VW5rbm93bnxWR1ZoYlhOVFpXTjFjbWwwZVZObGNuWnBZMlY4ZXlKV0lqb2lNQzR3TGpBd01EQWlMQ0pRSWpvaVYybHVNeklpTENKQlRpSTZJazkwYUdWeUlpd2lWMVFpT2pFeGZRPT18MXxMMk5vWVhSekx6RTVPamhtTWpnd1pETm1MVGxpTkRBdE5ERm1NaTFpWldNd0xUQmlNREExWm1Rd1pUYzBOMTloWldOak0yWTROUzAzTVRsa0xUUTVNV1l0T0RFM05pMDRabVZoT1dRME1HWTJPV05BZFc1eExtZGliQzV6Y0dGalpYTXZiV1Z6YzJGblpYTXZNVGMwTlRnek1UY3dPREUxTXc9PXxiMjA4NWRkYjE2ZjQ0NjY1OGIxNjA4ZGQ4NjM1MmJmOHwxNGIzZjViMGY3OTI0NTgxYTZhZjk5M2E5MDk4Mzg0NA%3D%3D&sdata=dTIvMzJBRUEwUVhzcnJmREtsZC9lNHM3dnFPdFRWUXo2QjFwN3NXVXBQaz0%3D&ovuser=2ac36cee-0617-4ac0-bebf-e1ce5dfab86c%2CAshok.Damerla%40jda.com
+
+nonprod-private test server:
+http://10.120.78.130/#/login  -- private cloud dev instance
+
+meta sheet non prod
+https://jda365.sharepoint.com/:x:/r/sites/iAutomateProd-Nonprodusecasesdetails/_layouts/15/doc2.aspx?CID=c9b0ecec-32a5-6f8d-a962-b196f2b87eb0&sourcedoc=%7B541CA3B5-59E5-4F57-8C72-8CF1302141D8%7D&file=iAutomate_ManageRunbook_Template%20-BY-17-12-21%20(1)%20(1).xlsx&action=default&mobileredirect=true&wdOrigin=TEAMS-WEB.p2p.p2p&wdExp=TEAMS-CONTROL&wdhostclicktime=1704711333647&web=1
+
+shortcuts
+tab-->leave space in right
+shift+tab-->move left 
+ctrl+\ --> to command
+
+Multiple blocks can have one rescue
+create project and template then 
+
+public test instance:
+https://veus2core1721/#/templates/job_template/444/details
+metasheet test
+https://jda365-my.sharepoint.com/:x:/g/personal/gayathri_venkatesan_jda_com/EfmHwUYEBXVEq9dyiBDoI-YBXlA35-ZnjI8swext_xvNUg?isSPOFile=1&ovuser=2ac36cee-0617-4ac0-bebf-e1ce5dfab86c%2CGayathri.Venkatesan%40jda.com&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiI0OS8yNTA3MDMxODgwNiIsIkhhc0ZlZGVyYXRlZFVzZXIiOmZhbHNlfQ%3D%3D
+
+
+projects/templates 
+
+test public:
+# MFT_SMTP_NotListening [Windows] and SMTP_25 Not listening 
+## Description
+
+To Check whether the Gateway is having the connectivity with the ports [22,443,8080] just update the ticket and close it. If it is not having the connectivity we need to check the Harmony Service if Harmony Service is stopped we need to start an recheck the connection of the gateway , after rechecking also its failed we need to transfer the case to last assignement group ,after recheck its sucesffully having the connection we can close the case..
+
+If port is 25 .It will connect  to target server and perform ping check .If connection is successful close the ticket else transfer the case 
+
+## Playbook & Common Scripts
+
+- Ansible Playbook - ***[MFT_SMTP_NotListening](roles/MFT_SMTP_NotListening/tasks/main.yml)***
+
+Based on the port number it will trigger the respective playbook from main.yml
+
+## Workflow MFT 
+
+- Connect to the particular Gateway with respect to the centralised server we are getting from ticket. 
+- then after connecting fetch the respective servers for the gateway.
+- Validate the connection for the particular gateway with the port which we got in ticket
+  `Example:- ports are 22,443,8080
+- If the connection is sucessfull
+  - Update WorkNotes as connection is sucesfull.
+  - close the ticket.
+- Else
+  - If not having the connection
+    - check the Harmony services 
+    - If the Harmony services are stoped for respective srevers of the gateway start the services , if service are running we can leave  
+    - Again recheck the connection, if its sucesfull
+    - update workontes and close the ticket.
+  - else if not able to connect after Services running
+    - Update the  log in worknotes.
+    - Transfer the case to last Assignment Group.
+
+## Workflow SMTP
+
+Script will execute when port is 25 .Connect to target server and check the connectivity using port 25 
+-If 
+  Connection to target server is successful it will close the ticket 
+-Else 
+  Transfer the case to SMTP team 
+
+http://veus2core1721/#/login 
+
+
+
+DR Template 
+===============================
+iAutomate_ManageRunbook_Template -BY_Prod - DR_latest.xlsx (sharepoint.com)
+ 
+ 
+DR -
+ 
+https://vaecore1712/#/login  (Asia East region)
+https://vausecore1712/#/login  (Australia South East region)
+https://vcuscore1712/#/login  (Central US region)
+https://veuncore1712/#/login  (Europe North region)
+ 
+ 
+ 
+ 
+ 
+private
+=========
+https://jda365.sharepoint.com/:x:/r/sites/iAutomateProd-Nonprodusecasesdetails/_layouts/15/doc2.aspx?sourcedoc=%7B541CA3B5-59E5-4F57-8C72-8CF1302141D8%7D&file=iAutomate_ManageRunbook_Template%20-BY-17-12-21%20(1)%20(1).xlsx&action=default&mobileredirect=true&cid=c9b0ecec-32a5-6f8d-a962-b196f2b87eb0&wdOrigin=TEAMS-WEB.p2p.p2p&wdExp=TEAMS-CONTROL&wdhostclicktime=1704711333647&web=1&ovuser=2ac36cee-0617-4ac0-bebf-e1ce5dfab86c%2CNikhileswarreddy.Jonnavaram%40jda.com&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIxNDE1LzI0MDIxNTI4NjE2IiwiSGFzRmVkZXJhdGVkVXNlciI6ZmFsc2V9
+ 
+ 
+ 
+ 
+AWX Tower details for 4 regions
+################################
+ 
+Eastus2-> https://byazus-auto-pr1.jdadelivers.com/#/login
+West Europe -> https://byazeu-auto-pr1.jdadelivers.com/#/login
+Australia East -> https://byazau-auto-pr1.jdadelivers.com/#/login
+Asia SE -> https://byazas-auto-pr1.jdadelivers.com/#/login
+ 
+dev-main: http://veus2core1721/#/home
+ 
+ 
+Meta data Links
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ 
+Asia SE -> iAutomate_ManageRunbook_Template_APAC1.xlsx
+ 
+West Europe -> iAutomate_ManageRunbook_Template_EMEA.xlsx
+ 
+Australia East-> iAutomate_ManageRunbook_Template_APAC2.xlsx
+ 
+Eastus2 ->iAutomate_ManageRunbook_Template_ANSIBLETOWER.xlsx
+ 
+ 
+DEV-metadata
+##################
+iAutomate_ManageRunbook_Template -BY (6).xlsx
+ 
+iAutomate_ManageRunbook_Template -BY (6).xlsx
+[12/18/23 10:27 PM] Lekkala Lavanya (CW)
+by mistake
+[12/18/23 10:27 PM] Lekkala Lavanya (CW)
+vacchindhi
+iAutomate_ManageRunbook_Template -BY (6).xlsx
+iAutomate_ManageRunbook_Template_EMEA.xlsx
+iAutomate_ManageRunbook_Template_ANSIBLETOWER.xlsx
+iAutomate_ManageRunbook_Template_APAC1.xlsx
+iAutomate_ManageRunbook_Template_APAC2.xlsx
+ 
+
+GIT command
+
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task
+$ git clone --branch SAS-24905 https://github.com/BY-Product-Development/cld-ops-iautomate-scripts.git
+Cloning into 'cld-ops-iautomate-scripts'...
+info: please complete authentication in your browser...
+remote: Enumerating objects: 74703, done.
+remote: Counting objects: 100% (6334/6334), done.
+remote: Compressing objects: 100% (405/405), done.
+remote: Total 74703 (delta 6247), reused 5911 (delta 5911), pack-reused 68369 (from 2)
+Receiving objects: 100% (74703/74703), 98.41 MiB | 5.26 MiB/s, done.
+Resolving deltas: 100% (39457/39457), done.
+Updating files: 100% (913/913), done.
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task
+$ cd cld-ops-iautomate-scripts/
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task/cld-ops-iautomate-scripts (SAS-24905)
+$ code .
+bash: code: command not found
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task/cld-ops-iautomate-scripts (SAS-24905)
+$ git commit -m "codify error resolved"
+[SAS-24905 765a6821d] codify error resolved
+ Committer: Gayathri Venkatesan (CW) <gayathri.venkatesan@jda.com>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task/cld-ops-iautomate-scripts (SAS-24905)
+$ git push
+info: please complete authentication in your browser...
+Enumerating objects: 20, done.
+Counting objects: 100% (20/20), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (7/7), done.
+Writing objects: 100% (8/8), 741 bytes | 741.00 KiB/s, done.
+Total 8 (delta 5), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (5/5), completed with 5 local objects.
+To https://github.com/BY-Product-Development/cld-ops-iautomate-scripts.git
+   59aea2a92..765a6821d  SAS-24905 -> SAS-24905
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task/cld-ops-iautomate-scripts (SAS-24905)
+$ git pull
+info: please complete authentication in your browser...
+remote: Enumerating objects: 8, done.
+remote: Counting objects: 100% (8/8), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 8 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 8.66 KiB | 184.00 KiB/s, done.
+From https://github.com/BY-Product-Development/cld-ops-iautomate-scripts
+   765a6821d..60948fb6c  SAS-24905  -> origin/SAS-24905
+Updating 765a6821d..60948fb6c
+Fast-forward
+ .../roles/Zabbix_Maintenance/files/zabbix_final.py | 52 +++++++---------------
+ 1 file changed, 17 insertions(+), 35 deletions(-)
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task/cld-ops-iautomate-scripts (SAS-24905)
+$ ^C
+
+1029311@IN2-1029311HCL MINGW64 ~/OneDrive - Blue Yonder/Documents/git_task/cld-ops-iautomate-scripts (SAS-24905)
+$
+
+
+PS C:\Users\1029311\OneDrive - Blue Yonder\Documents\git_task\cld-ops-iautomate-scripts> git pull origin main 
+info: please complete authentication in your browser...
+From https://github.com/BY-Product-Development/cld-ops-iautomate-scripts
+ * branch                main       -> FETCH_HEAD
+Auto-merging src/Zabbix_Maintenance/readme.md
+CONFLICT (content): Merge conflict in src/Zabbix_Maintenance/readme.md
+Auto-merging src/Zabbix_Maintenance/roles/Zabbix_Maintenance/files/inventory.csv
+ance_create.yml
+CONFLICT (content): Merge conflict in src/Zabbix_Maintenance/roles/Zabbix_Maintenance/tasks/zabbix_Maintenance_create.yml 
+ance_create.yml
+CONFLICT (content): Merge conflict in src/Zabbix_Maintenance/roles/Zabbix_Maintenance/tasks/zabbix_Maintenance_create.ymlflict in src/Zabbix_Maintenance/roles/Zabbix_Maintenance/tasks/
+ance_create.yml
+ance_create.yml
+ance_create.yml
+ance_create.yml
+CONFLICT (content): Merge conflict in src/Zabbix_Maintenance/roles/Zabbix_Maintenance/tasks/zabbix_Maintenance_create.yml
+CONFLICT (content): Merge conflict in src/Zabbix_Maintenance/roles/Zabbix_Maintenance/tasks/zabbix_Maintenance_CONFLICT (content): Merge conflict in src/Zabbix_Maintenance/roles/Zabbix_Maintenance/tasks/zabbix_Maintenance_update.yml
+Automatic merge failed; fix conflicts and then commit the result.
+PS C:\Us   \1029311\OneDrive - Blue Yonder\Documents\git_task\cld-ops-iautomate-scripts>
+PS C:\Users\1029311\OneDrive - Blue Yonder\Documents\git_task\cld-ops-iautomate-scripts> git status
+On branch SAS-24905
+Your branch is up to date with 'origin/SAS-24905'.
+
+nothing to commit, working tree clean
+
+
+
+
